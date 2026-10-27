@@ -1,0 +1,13 @@
+runpod==1.7.13
+torchaudio==2.6.0
+librosa==0.10.2.post1
+transformers==4.46.3
+diffusers==0.29.0
+conformer==0.3.2
+numpy==2.1.3
+s3tokenizer==0.1.7
+num2words==0.5.14
+safetensors==0.4.5
+huggingface_hub==0.26.5
+omegaconf==2.3.0
+einops==0.8.0
