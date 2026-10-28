@@ -20,6 +20,7 @@ import time
 
 import runpod
 import torch
+from num2words import num2words
 
 MODEL_DIR = os.environ.get("OOLEL_MODEL_DIR", "/models/oolel")
 MAX_CHARS = 2500
@@ -48,6 +49,47 @@ def _settings(inp: dict) -> dict:
         lo, hi = LIMITS[k]
         out[k] = min(hi, max(lo, v))
     return out
+
+
+MONTHS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre",
+          "novembre", "décembre"]
+ABBREVIATIONS = [
+    (r"\b24\s*h\s*/\s*24\b", "vingt-quatre heures sur vingt-quatre"), (r"\b7\s*j\s*/\s*7\b", "sept jours sur sept"),
+    (r"[()]", " "),
+    (r"\bn°\s*", "numéro "), (r"\bSA\b", "semaines"), (r"\bCPN\b", "consultation prénatale"),
+    (r"\bRDV\b", "rendez-vous"), (r"\bSAMU\b", "Samu"), (r"\bIA\b", "intelligence artificielle"),
+    (r"\bkg\b", "kilos"), (r"\bcm\b", "centimètres"), (r"\+221\s*", ""),
+]
+
+
+def _fr(n: str) -> str:
+    try:
+        return num2words(int(n), lang="fr")
+    except (ValueError, NotImplementedError, OverflowError):
+        return n
+
+
+def normalize(text: str) -> str:
+    """Prepare text the way the Oolel-Voices demo does: numbers as French words (Wolof speakers say
+    numbers in French), plus dates, times and abbreviations found in Awa's replies."""
+    text = re.sub(r"[*_~`•]", " ", text)
+    for pattern, repl in ABBREVIATIONS:
+        text = re.sub(pattern, repl, text)
+    # dates: 28/10 or 28/10/2026 -> "le vingt-huit octobre (deux mille vingt-six)"
+    def date_repl(m):
+        day, month, year = int(m.group(1)), int(m.group(2)), m.group(3)
+        if not (1 <= day <= 31 and 1 <= month <= 12):
+            return m.group(0)
+        out = f"{'premier' if day == 1 else _fr(str(day))} {MONTHS[month - 1]}"
+        return out + (f" {_fr(year if len(year) == 4 else '20' + year)}" if year else "")
+    text = re.sub(r"\b(\d{1,2})/(\d{1,2})(?:/(\d{2}|\d{4}))?\b", date_repl, text)
+    # times: 10:00, 10h30
+    text = re.sub(r"\b(\d{1,2})[:h](\d{2})\b",
+                  lambda m: f"{_fr(m.group(1))} heures" + ("" if m.group(2) == "00" else f" {_fr(m.group(2))}"), text)
+    # decimals then integers
+    text = re.sub(r"\b(\d+)[.,](\d+)\b", lambda m: f"{_fr(m.group(1))} virgule {_fr(m.group(2))}", text)
+    text = re.sub(r"\b\d+\b", lambda m: _fr(m.group(0)), text)
+    return re.sub(r"\s+", " ", text).strip()
 
 
 def _chunks(text: str) -> list[str]:
@@ -92,7 +134,7 @@ def handler(job):
         _prepare_voice(voice_b64, workdir, cfg)
         pieces = []
         with torch.inference_mode():
-            for chunk in _chunks(text):
+            for chunk in _chunks(normalize(text)):
                 pieces.append(MODEL.generate(chunk, cfg_weight=cfg["cfg_weight"], exaggeration=cfg["exaggeration"],
                                              temperature=cfg["temperature"]).cpu())
                 pieces.append(torch.zeros(1, int(MODEL.sr * cfg["pause"])))  # short pause between chunks
