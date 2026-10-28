@@ -1,7 +1,7 @@
-# SunuJigeen – Wolof voice worker
+# Suñu Jigeen – Wolof voice worker
 
 RunPod Serverless worker that turns a Wolof text into a WhatsApp voice note (OGG/Opus), for the
-SunuJigeen Santé WhatsApp assistant.
+Suñu Jigeen Santé WhatsApp assistant.
 
 - Model: [Oolel-Voices](https://huggingface.co/soynade-research/Oolel-Voices) by Soynade Research,
   used **unmodified**, pinned to revision `fb8a693e0d86e00672a04810cc5f331789cc0fb4`.
